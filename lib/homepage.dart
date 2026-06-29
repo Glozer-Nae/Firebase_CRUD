@@ -3,11 +3,19 @@ import 'package:firebase_setup/crud_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
-class Homepage extends StatelessWidget {
-    final CrudService service = CrudService();
-    final TextEditingController nameCtrl = TextEditingController();
-    final TextEditingController qtyCtrl = TextEditingController();
-    Homepage({super.key});
+class Homepage extends StatefulWidget {
+  const Homepage({super.key});
+
+  @override
+  State<Homepage> createState() => _HomepageState();
+}
+
+class _HomepageState extends State<Homepage> {
+  final CrudService service = CrudService();
+  final TextEditingController nameCtrl = TextEditingController();
+  final TextEditingController qtyCtrl = TextEditingController();
+
+  bool showFavoritesOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +25,21 @@ class Homepage extends StatelessWidget {
         title: const Text('Firebase Alolod'),
         centerTitle: true,
         backgroundColor: Colors.teal,
+        actions: [
+          IconButton(
+            icon: Icon(
+              showFavoritesOnly
+                  ? Icons.favorite
+                  : Icons.favorite_border,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                showFavoritesOnly = !showFavoritesOnly;
+              });
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.teal,
@@ -30,7 +53,11 @@ class Homepage extends StatelessWidget {
           if(!snapshot.hasData){ 
             return const Center(child: CircularProgressIndicator());
           }
-          final docs = snapshot.data!.docs;
+          final docs = showFavoritesOnly
+            ? snapshot.data!.docs
+                .where((doc) => (doc['favorite'] ?? false) == true)
+                .toList()
+            : snapshot.data!.docs;
 
           if(docs.isEmpty) { 
             return const Center(child: Text('No items found', style: TextStyle(fontSize: 18)));
