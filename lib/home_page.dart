@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_setup/auth_service.dart';
 import 'package:firebase_setup/crud_service.dart';
+import 'package:firebase_setup/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -22,7 +24,7 @@ class _HomepageState extends State<Homepage> {
     return Scaffold(
       backgroundColor: Colors.grey,
       appBar: AppBar(
-        title: const Text('Firebase Alolod'),
+        title: const Text('Home Page - Alolod'),
         centerTitle: true,
         backgroundColor: Colors.teal,
         actions: [
@@ -39,6 +41,17 @@ class _HomepageState extends State<Homepage> {
               });
             },
           ),
+
+          IconButton( 
+            icon: Icon(Icons.logout), 
+            onPressed: () { 
+              AuthService().signOut();
+              Navigator.pushReplacement( 
+                context, 
+                MaterialPageRoute(builder: (_) => LoginPage())
+              );
+            }
+          )
         ],
       ),
       floatingActionButton: FloatingActionButton(

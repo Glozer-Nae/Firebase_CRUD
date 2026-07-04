@@ -12,7 +12,12 @@
           "package_name": "com.example.firebase_setup"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "517307621575-0qp026vuei52jfhukqqnvvs18sjsjm74.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAYfc-sI0Bcg5fM8GLtP5wGi3Hdn7Clkgw"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "517307621575-0qp026vuei52jfhukqqnvvs18sjsjm74.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "517307621575-8573a7lulkehr0b2pqql29ss814iaegf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.firebaseSetup"
+              }
+            }
+          ]
         }
       }
     }
