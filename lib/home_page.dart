@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_setup/auth_service.dart';
 import 'package:firebase_setup/crud_service.dart';
@@ -43,7 +45,7 @@ class _HomepageState extends State<Homepage> {
           ),
 
           IconButton( 
-            icon: Icon(Icons.logout), 
+            icon: const Icon(Icons.logout), 
             onPressed: () { 
               AuthService().signOut();
               Navigator.pushReplacement( 
@@ -66,9 +68,14 @@ class _HomepageState extends State<Homepage> {
           if(!snapshot.hasData){ 
             return const Center(child: CircularProgressIndicator());
           }
+          
+          // FIX 1: Safely filter documents by converting to a map first
           final docs = showFavoritesOnly
             ? snapshot.data!.docs
-                .where((doc) => (doc['favorite'] ?? false) == true)
+                .where((doc) {
+                  final data = doc.data() as Map<String, dynamic>?;
+                  return (data?['favorite'] ?? false) == true;
+                })
                 .toList()
             : snapshot.data!.docs;
 
@@ -81,34 +88,49 @@ class _HomepageState extends State<Homepage> {
             itemCount: docs.length,
             itemBuilder: (context, index) { 
               var item = docs[index];
+
+              final data = item.data() as Map<String, dynamic>;
+              final imageUrl = data['image_url'];
+              
+              // FIX 2: Safely read the favorite status from the data map
+              final isFavorite = data['favorite'] == true; 
+
               return Card(
               elevation: 3,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.symmetric(vertical: 6),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+
+                leading: imageUrl != null
+                  ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      imageUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                  :null,
                 title: Text(
-                  item['name'],
+                  data['name'] ?? '',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                subtitle: Text("Quantity ${item['quantity']}",
+                subtitle: Text("Quantity ${data['quantity'] ?? 0}",
                 style: const TextStyle (fontSize: 14, color: Colors.grey),
                 ),
-               trailing: Row(
+               trailing: Row( 
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       icon: Icon(
-                        item['favorite'] == true
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: item['favorite'] == true
-                            ? Colors.red
-                            : Colors.white,
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.white,
                       ),
                       onPressed: () => service.toggleFavorite(
                         item.id,
-                        item['favorite'] ?? false,
+                        isFavorite,
                       ),
                     ),
                     IconButton(
@@ -146,6 +168,10 @@ void _confirmDelete(BuildContext context, String id){
             Navigator.pop(context);
           },
         ), 
+        TextButton(
+          child: const Text("Cancel"),
+          onPressed: () => Navigator.pop(context), 
+        )
       ],
     ) 
   );
@@ -156,15 +182,20 @@ void openAddDialog(BuildContext context) {
   nameCtrl.clear();
   qtyCtrl.clear();
 
+  File? selectedImageFile;
+  String? selectedImageUrl;
+
+
   showDialog(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (_) => StatefulBuilder(builder: (context, setState) =>
+    AlertDialog(
       title: const Text("Add item"),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: nameCtrl,
+            controller: nameCtrl, 
             decoration: InputDecoration(
               labelText: "Name",
               border: OutlineInputBorder(
@@ -172,7 +203,7 @@ void openAddDialog(BuildContext context) {
               ),
             ), 
           ), 
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           TextField(
             controller: qtyCtrl,
             decoration: InputDecoration(
@@ -181,7 +212,34 @@ void openAddDialog(BuildContext context) {
                 borderRadius: BorderRadius.circular(8),
               ),
             ), 
-          ), 
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 10),
+          if (selectedImageFile != null) 
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                selectedImageFile!, 
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(  
+              icon: const Icon(Icons.upload_file),
+              label: const Text("Upload Image"),
+              onPressed: () async { 
+                final pickedFile = await service.pickImageForAddItem();
+                if(pickedFile != null) {
+                  setState((){ 
+                    selectedImageFile = pickedFile.file;
+                    selectedImageUrl = pickedFile.url;
+                  });
+                }
+              }
+            )
+          
         ],
       ), 
       actions: [
@@ -198,11 +256,12 @@ void openAddDialog(BuildContext context) {
             ),
           ),
           child: const Text("Save"),
-          onPressed: () {
+          onPressed: () async {
             if (nameCtrl.text.isNotEmpty && qtyCtrl.text.isNotEmpty) {
-                service.addItem(
-                nameCtrl.text,
-                int.parse(qtyCtrl.text),
+                await service.addItemWithImage(
+                  nameCtrl.text,
+                  int.parse(qtyCtrl.text),
+                  selectedImageUrl,
               );
               Navigator.pop(context);
             }
@@ -210,13 +269,16 @@ void openAddDialog(BuildContext context) {
         ),
       ],
     ),
+    ),
   );
 }
 
 //EDIT UI
 void openEditDialog(BuildContext context, DocumentSnapshot item) {
-  nameCtrl.text = item['name'];
-  qtyCtrl.text = item['quantity'].toString();
+  // Using safely accessed map keys here too just in case
+  final data = item.data() as Map<String, dynamic>?;
+  nameCtrl.text = data?['name'] ?? '';
+  qtyCtrl.text = (data?['quantity'] ?? 0).toString();
 
   showDialog(
     context: context,
@@ -273,10 +335,8 @@ void openEditDialog(BuildContext context, DocumentSnapshot item) {
         ),
       ],
     ),
+    
   );
 }
 
-
 }
-
-
